@@ -1,0 +1,9 @@
+smiles,solvent,abs,em,qy,loge
+C(=C/c1ccnc2ccccc12)\c1ccc(N(c2ccccc2)c2ccccc2)cc1,ClC(Cl)Cl,397,519,0.29,4.4012
+C=CCn1c2ccccc2c2cc(C(=O)OC)nc(-c3nc4ccccc4s3)c21,ClC(Cl)Cl,382,440,0.193,4.418
+c1ccc(N(c2ccccc2)c2ccc(-c3ccc(-c4ccc(-c5ccc(-c6ccc(N(c7ccccc7)c7ccccc7)cc6)s5)c5nsnc45)s3)cc2)cc1,ClC(Cl)Cl,530,690,0.23,4.1814
+CC(=O)OCCN1C(=O)c2cccc3c(Oc4ccc(C=O)cc4)ccc(c23)C1=O,ClC(Cl)Cl,353,411,0.11,4.259
+CC(C)(C)/C=C/C1=[N+]2C(=C(c3c4ccccc4cc4ccccc34)c3ccc(/C=C/C(C)(C)C)n3[B-]2(F)F)C=C1,ClC(Cl)Cl,582,589,0.58,5.0286
+Cc1cc(=O)oc2cc3c4ccc(C(C)(C)C)cc4c4cc(C(C)(C)C)ccc4c3cc12,ClC(Cl)Cl,385,423,0.14,4.1511
+C(=C/c1ccnc2ccccc12)\c1ccc(/C=C/c2ccnc3ccccc23)cc1,ClC(Cl)Cl,370,433,0.292,4.699
+C=CCn1c2ccccc2c2cc(C(=O)OC)nc(-c3nc4ccccc4[nH]3)c21,ClC(Cl)Cl,382,425,0.215,4.4176

@@ -21,6 +21,12 @@ pip install transformers
 
 For further details, please refer to the [KPGT](https://github.com/lihan97/KPGT) repository. And in this paper we reuse the pretrained model and dataset from the KPGT repository.
 
+## Datasets
+
+The full dataset for fluorencent molecule prediction is around 6 GB. You can email us at `molastra@hotmail.com` to request a copy. 😊
+
+Now we update the dataset to zenodo, please feel free to download the [monster](https://zenodo.org/records/17718274).
+
 ## Experiments
 
 ```bash
@@ -44,3 +50,12 @@ please refer `notebooks` and `plots` folder for more details. And also you can f
 ```bash
 bash case_study.sh
 ```
+
+## Model Interpretation via Shapley Values in LightGBM
+
+- `shap`
+  - `shap.csv`
+  - `train_ml_absorption.ipynb`
+  - `train_ml_emission.ipynb`
+  - `train_ml_log_molar_absorptivity.ipynb`
+  - `train_ml_quantum_yield.ipynb`
