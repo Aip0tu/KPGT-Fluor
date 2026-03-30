@@ -26,13 +26,13 @@ logger.add(sys.stdout, level="DEBUG")
 
 def parse_args():
     """
-    Parse command line arguments
+    解析命令行参数。
     """
     parser = argparse.ArgumentParser(description="Arguments for training LiGhT")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--n_threads", type=int, default=8)
 
-    # Experiment settings
+    # 实验配置
     parser.add_argument("--config", type=str, default="base")
     parser.add_argument("--model_path", type=str, required=True)
     parser.add_argument("--dataset", type=str, required=True)
@@ -51,7 +51,7 @@ def parse_args():
     )
     parser.add_argument("--split", type=str, required=True)
 
-    # Training hyperparameters
+    # 训练超参数
     parser.add_argument("--n_epochs", type=int, default=50)
     parser.add_argument("--batch_size", type=int, default=32)
     parser.add_argument("--weight_decay", type=float, default=0)
@@ -59,12 +59,12 @@ def parse_args():
     parser.add_argument("--lr", type=float, default=1e-4)
     parser.add_argument("--no_norm_label", action="store_true")
 
-    # Model hyperparameters
+    # 模型超参数
     parser.add_argument("--n_predictor_layers", type=int, default=2)
     parser.add_argument("--d_predictor_hidden", type=int, default=256)
 
-    # Fine-tuning strategies
-    # FLAG
+    # 微调策略
+    # FLAG 对抗扰动训练
     parser.add_argument("--use_flag", action="store_true")
     parser.add_argument("--flag_m", type=int, default=3, choices=[1, 2, 3, 4])
     parser.add_argument(
@@ -73,17 +73,17 @@ def parse_args():
         default=0.001,
         choices=[0.001, 0.003, 0.005, 0.01],
     )
-    # LLRD
+    # LLRD 分层学习率衰减
     parser.add_argument("--use_llrd", action="store_true")
     parser.add_argument(
         "--llrd_decay_coef", type=float, default=0.8, choices=[0.95, 0.9, 0.85, 0.8]
     )
-    # L2SP
+    # L2SP 约束与预训练参数保持接近
     parser.add_argument("--use_l2sp", action="store_true")
     parser.add_argument(
         "--l2sp_weight", type=float, default=0.0001, choices=[0.0001, 0.001, 0.01, 0.1]
     )
-    # ReInit
+    # ReInit 重置顶部若干层参数
     parser.add_argument("--use_reinit", action="store_true")
     parser.add_argument("--reinit_n_layers", type=int, default=3, choices=[1, 2, 3, 4])
 
@@ -95,7 +95,7 @@ def parse_args():
 
 def init_params(module):
     """
-    Initialize model parameters
+    初始化模型参数。
     """
     if isinstance(module, nn.Linear):
         module.weight.data.normal_(mean=0.0, std=0.02)
@@ -107,7 +107,7 @@ def init_params(module):
 
 def seed_worker(worker_id):
     """
-    Set random seed
+    为 DataLoader 的 worker 设置随机种子。
     """
     worker_seed = torch.initial_seed() % 2**32
     np.random.seed(worker_seed)
@@ -116,7 +116,7 @@ def seed_worker(worker_id):
 
 def get_llrd_lr(model, init_lr, decay_coef):
     """
-    Get LLRD learning rate
+    为不同层生成 LLRD 分层学习率。
     """
     param_coef = {
         "predictor": init_lr * 1,
@@ -154,7 +154,7 @@ def get_predictor(
     d_input_feats, n_tasks, n_layers, predictor_drop, device, d_hidden_feats=None
 ):
     """
-    Get predictor
+    构建下游任务预测头。
     """
     if n_layers == 1:
         predictor = nn.Linear(d_input_feats, n_tasks)
@@ -175,7 +175,7 @@ def get_predictor(
 
 def finetune(args):
     """
-    Fine-tune model
+    加载预训练权重并执行外部数据微调。
     """
     set_random_seed(args.seed)
     config = config_dict[args.config]
@@ -185,7 +185,7 @@ def finetune(args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     collator = Collator_tune(config["path_length"])
 
-    # Dataset loading
+    # 加载训练、验证和测试数据
     train_dataset = MoleculeDataset(
         root_path=args.data_path,
         dataset=args.dataset,
@@ -239,7 +239,7 @@ def finetune(args):
         collate_fn=collator,
     )
 
-    # Model loading
+    # 初始化 LiGhT 骨干网络
     model = LiGhT(
         d_node_feats=config["d_node_feats"],
         d_edge_feats=config["d_edge_feats"],
@@ -258,6 +258,7 @@ def finetune(args):
         n_node_types=vocab.vocab_size,
     ).to(device)
 
+    # 先替换成任务相关的预测头，再加载预训练权重。
     logger.info(
         f"{train_dataset.n_tasks}, {args.n_predictor_layers}, {args.d_predictor_hidden}"
     )
@@ -274,7 +275,7 @@ def finetune(args):
     del model.fp_predictor
     del model.node_predictor
     
-    # Fine-tuning settings
+    # 仅保留微调所需的参数头，避免误用预训练阶段的辅助头
     model.load_state_dict(
         {
             k.replace("module.", ""): v
@@ -306,6 +307,7 @@ def finetune(args):
     else:
         loss_fn = BCEWithLogitsLoss(reduction="none")
 
+    # 回归任务默认对标签做标准化，评估时再还原到原始量纲。
     if args.dataset_type == "regression" and (not args.no_norm_label):
         mean, std = train_dataset.mean.numpy(), train_dataset.std.numpy()
     else:
@@ -321,7 +323,7 @@ def finetune(args):
     result_tracker = Result_Tracker(args.metric)
     summary_writer = None
 
-    # Fine-tuning
+    # 根据配置选择微调训练器
     if args.use_flag:
         trainer = FLAG_Trainer(
             args,

@@ -32,7 +32,7 @@ def preprocess_dataset(args):
     smiless = df.smiles.values.tolist()
     solvent_smiless = df.solvent.values.tolist()
 
-    # Task names was specified here
+    # 当前下游流程默认一个目录对应一个任务，任务名直接取数据集目录名
     task_names = [args.dataset]
 
     logger.info("constructing graphs")
@@ -53,11 +53,13 @@ def preprocess_dataset(args):
         else:
             logger.warning(f"graph {i} is None, smiles: {smiless[i]}")
 
+    # 图构建失败的样本要同步过滤掉标签，保证图和监督信号严格对齐。
     _label_values = df[task_names].values
     labels = F.zerocopy_from_numpy(_label_values.astype(np.float32))[valid_ids]
     logger.info("saving graphs")
     save_graphs(cache_file_path, valid_graphs, labels={"labels": labels})
 
+    # 指纹、分子描述符和溶剂描述符会在微调阶段与图表示拼接使用。
     logger.info("extracting fingerprints")
     FP_list = []
     for smiles in tqdm(smiless):

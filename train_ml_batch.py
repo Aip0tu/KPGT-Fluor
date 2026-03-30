@@ -17,18 +17,18 @@ logger.add(sys.stdout, level="DEBUG")
 
 def get_model(model_name: str, random_state: int = 42, verbose: bool = True):
     """
-    Returns the specified regression model based on the model_name.
+    根据名称返回对应的传统回归模型。
 
-    :param model_name: Model name as string ('rf', 'svr', 'lightgbm', 'gbrt')
-    :param random_state: Random state for reproducibility
-    :param verbose: Whether to display detailed logs for the model (for models that support it)
+    :param model_name: 模型名称，可选 `rf`、`svr`、`lightgbm`、`gbrt`
+    :param random_state: 随机种子，保证结果可复现
+    :param verbose: 是否输出更详细的训练日志（仅对支持该参数的模型生效）
 
-    :return: A model instance
+    :return: 对应模型实例
     """
     if model_name == "rf":
         return RandomForestRegressor(random_state=random_state, verbose=verbose, n_estimators=500, n_jobs=4)
     elif model_name == "svr":
-        return SVR()  # SVR doesn't take random_state directly
+        return SVR()  # SVR 本身不直接接收 random_state
     elif model_name == "lightgbm":
         return lgb.LGBMRegressor(random_state=random_state, n_estimators=500, n_jobs=4)
     elif model_name == "gbrt":
@@ -68,7 +68,7 @@ def run_single_task(
         split="val",
     )
 
-    # Extract features and labels from the train dataset
+    # 从训练集样本中拼接分子指纹、分子描述符和溶剂描述符
     smiles_list, solvent_list, graphs, fps, mds, sds, labels = map(
         list, zip(*train_dataset)
     )
@@ -77,7 +77,7 @@ def run_single_task(
     assert features.shape[0] == labels.shape[0]
     logger.debug(f"Train shape: {features.shape}, {labels.shape}")
 
-    # Train the model
+    # 训练传统机器学习回归模型
     logger.info(f"Training {model_name} model")
     model = get_model(model_name)
     model.fit(features, labels)
@@ -85,10 +85,10 @@ def run_single_task(
     joblib.dump(model, save_path)
     logger.info(f"Model saved to {save_path}")
 
-    # Make predictions on the training set and validation set
+    # 在训练集和验证集上分别做推理，便于比较过拟合情况
     preds_train = model.predict(features)
 
-    # Extract features and labels from the validation dataset
+    # 提取验证集特征并保持与训练集相同的拼接顺序
     (
         val_smiles_list,
         val_solvent_list,
@@ -108,7 +108,7 @@ def run_single_task(
 
     preds_val = model.predict(val_features)
 
-    # Calculate evaluation metrics
+    # 计算回归指标
     train_rmse = np.sqrt(mean_squared_error(labels, preds_train))
     val_rmse = np.sqrt(mean_squared_error(val_labels, preds_val))
     train_r2 = r2_score(labels, preds_train)

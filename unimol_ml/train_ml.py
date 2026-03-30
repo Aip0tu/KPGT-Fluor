@@ -13,6 +13,7 @@ import joblib
 from sklearn.metrics import mean_squared_error, r2_score
 
 import sys
+
 sys.path.append("../")
 from src.data.finetune_dataset import MoleculeDataset
 
@@ -32,20 +33,20 @@ class UnimolReprResource:
 
 def get_model(model_name: str, random_state: int = 42, verbose: bool = True):
     """
-    Returns the specified regression model based on the model_name.
+    根据名称返回对应的传统回归模型。
 
-    :param model_name: Model name as string ('rf', 'svr', 'lightgbm', 'gbrt')
-    :param random_state: Random state for reproducibility
-    :param verbose: Whether to display detailed logs for the model (for models that support it)
+    :param model_name: 模型名称，可选 `rf`、`svr`、`lightgbm`、`gbrt`
+    :param random_state: 随机种子，保证结果可复现
+    :param verbose: 是否输出更详细的训练日志（仅对支持该参数的模型生效）
 
-    :return: A model instance
+    :return: 对应模型实例
     """
     if model_name == "rf":
         return RandomForestRegressor(
             random_state=random_state, verbose=verbose, n_estimators=500, n_jobs=4
         )
     elif model_name == "svr":
-        return SVR()  # SVR doesn't take random_state directly
+        return SVR()  # SVR 本身不直接接收 random_state
     elif model_name == "lightgbm":
         return lgb.LGBMRegressor(random_state=random_state, n_estimators=500, n_jobs=4)
     elif model_name == "gbrt":
@@ -91,7 +92,7 @@ def run_single_task(
     )
 
     # =======================
-    # Train set processing
+    # 处理训练集
     # =======================
     (
         raw_smiles,
@@ -116,7 +117,7 @@ def run_single_task(
     ):
         emb = unimol_repr_resource.get(smi)
         if emb is None:
-            continue  # 过滤掉没有 Unimol 表征的样本
+            continue  # 过滤掉缺少 UniMol 表征的样本。
 
         train_smiles.append(smi)
         train_solvent.append(solv)
@@ -129,6 +130,7 @@ def run_single_task(
     if len(train_labels) == 0:
         raise RuntimeError("No valid training samples after filtering None embeddings.")
 
+    # 将 UniMol 表征与传统分子/溶剂描述符拼接成最终输入。
     X_train = np.hstack(
         [
             np.vstack(train_embeddings),
@@ -143,7 +145,7 @@ def run_single_task(
     logger.debug(f"Train shape: {X_train.shape}, {y_train.shape}")
 
     # =======================
-    # Model training
+    # 训练模型
     # =======================
     logger.info(f"Training {model_name} model")
     model = get_model(model_name)
@@ -156,7 +158,7 @@ def run_single_task(
     preds_train = model.predict(X_train)
 
     # =======================
-    # Validation set processing
+    # 处理验证集
     # =======================
     (
         raw_val_smiles,
@@ -177,11 +179,16 @@ def run_single_task(
     val_labels = []
 
     for smi, solv, fp, md, sd, y in zip(
-        raw_val_smiles, raw_val_solvent, raw_val_fps, raw_val_mds, raw_val_sds, raw_val_labels
+        raw_val_smiles,
+        raw_val_solvent,
+        raw_val_fps,
+        raw_val_mds,
+        raw_val_sds,
+        raw_val_labels,
     ):
         emb = unimol_repr_resource.get(smi)
         if emb is None:
-            continue
+            continue  # 验证集同样只保留存在 UniMol 表征的样本。
 
         val_smiles.append(smi)
         val_solvent.append(solv)
@@ -210,18 +217,18 @@ def run_single_task(
     preds_val = model.predict(X_val)
 
     # =======================
-    # Evaluation
+    # 评估效果
     # =======================
     train_rmse = np.sqrt(mean_squared_error(y_train, preds_train))
     val_rmse = np.sqrt(mean_squared_error(y_val, preds_val))
     train_r2 = r2_score(y_train, preds_train)
     val_r2 = r2_score(y_val, preds_val)
 
-    logger.info(f"Train RMSE: {train_rmse:.4f}, Train R²: {train_r2:.4f}")
-    logger.info(f"Validation RMSE: {val_rmse:.4f}, Validation R²: {val_r2:.4f}")
+    logger.info(f"Train RMSE: {train_rmse:.4f}, Train R虏: {train_r2:.4f}")
+    logger.info(f"Validation RMSE: {val_rmse:.4f}, Validation R虏: {val_r2:.4f}")
 
     # =======================
-    # Save predictions
+    # 保存预测结果
     # =======================
     df_train = pd.DataFrame(
         {
@@ -245,6 +252,7 @@ def run_single_task(
     df_val.to_csv(save_dir / "valid.csv", index=False)
 
     logger.info("Finished run_single_task successfully")
+
 
 if __name__ == "__main__":
     for fold in range(5):

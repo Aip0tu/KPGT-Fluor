@@ -35,14 +35,14 @@ def main(
     logger.info(f"Loaded {len(smiles)} embeddings with shape {embeddings.shape}")
 
     # ======================
-    # Scale embeddings
+    # 标准化 UniMol 向量
     # ======================
     logger.info("Fitting StandardScaler on embeddings")
     scaler = StandardScaler()
     embeddings_scaled = scaler.fit_transform(embeddings)
 
     # ======================
-    # Rebuild dict
+    # 重新构建 smiles -> embedding 映射
     # ======================
     scaled_smiles2emb = {}
     for smi, emb_scaled in zip(smiles, embeddings_scaled):
@@ -52,7 +52,7 @@ def main(
     joblib.dump(
         {
             "embeddings": scaled_smiles2emb,
-            "scaler": scaler,  # 🔑 强烈建议一起保存
+            "scaler": scaler,  # 保留 scaler，便于推理阶段对新样本复用同一套变换。
         },
         output_path,
     )

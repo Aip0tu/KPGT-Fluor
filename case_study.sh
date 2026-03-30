@@ -4,8 +4,8 @@ set -e
 
 split_method="scaffold"
 fold=1
-dataset_name="consolidation" # consolidation
-task_name="absorption"    # absorption, emission, quantum_yield, log_molar_absorptivity
+dataset_name="consolidation" # 可选数据集：consolidation
+task_name="absorption"    # 可选任务：absorption、emission、quantum_yield、log_molar_absorptivity
 cuda_id=3
 
 python ../preprocess_downstream_dataset.py --data_path "datasets/${task_name}/input.csv" --dataset ${task_name}
@@ -16,8 +16,8 @@ CUDA_VISIBLE_DEVICES=${cuda_id} python finetune.py --config base --model_path mo
 
 split_method="scaffold"
 fold=1
-dataset_name="consolidation" # consolidation
-task_name="absorption"       # absorption, emission, quantum_yield, log_molar_absorptivity
+dataset_name="consolidation" # 可选数据集：consolidation
+task_name="absorption"       # 可选任务：absorption、emission、quantum_yield、log_molar_absorptivity
 cuda_id=3
 
 CUDA_VISIBLE_DEVICES=${cuda_id} python predict.py \

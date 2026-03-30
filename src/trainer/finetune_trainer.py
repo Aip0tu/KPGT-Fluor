@@ -88,6 +88,7 @@ class Trainer:
             self.train_epoch(model, train_loader, epoch)
             if self.local_rank == 0:
                 val_result = self.eval(model, val_loader)
+                # 如需同步追踪 test/train 指标，可在这里额外打开评估。
                 # test_result = self.eval(model, test_loader)
                 # train_result = self.eval(model, train_loader)
                 if self.result_tracker.update(
@@ -134,6 +135,7 @@ class Trainer:
         labels = torch.cat(labels_all).numpy()
 
         if self.evaluator.mean is not None and self.evaluator.std is not None:
+            # 导出文件时恢复到原始标签量纲，方便直接和真实值比较。
             _predictions = predictions * self.evaluator.std + self.evaluator.mean
 
         result = self.evaluator.eval(labels, predictions)
@@ -350,7 +352,7 @@ class L2SP_Trainer(Trainer):
                         self.save_model(
                             model, save_dir / f"{self.args.config}" / f"checkpoint.pth"
                         )
-                if epoch - best_epoch >= 20:  # early stopping
+                if epoch - best_epoch >= 20:  # 提前停止
                     break
         return (
             np.mean(best_train_result),

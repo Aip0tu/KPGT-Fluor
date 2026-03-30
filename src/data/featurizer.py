@@ -63,7 +63,7 @@ class Vocab(object):
 
     def construct(self):
         vocab = {}
-        # bonded Triplets
+        # 构建“两个原子 + 一条键”组成的 triplet 词表
         atom_ids = list(range(self.n_atom_types))
         bond_ids = list(range(self.n_bond_types))
         id = 0
@@ -106,13 +106,13 @@ class Vocab(object):
 def smiles_to_graph(smiles, vocab, max_length=5, n_virtual_nodes=8, add_self_loop=True):
     d_atom_feats = 137
     d_bond_feats = 14
-    # Canonicalize
+    # 先将 SMILES 规范化，固定原子顺序，保证同一分子对应稳定图结构。
     mol = Chem.MolFromSmiles(smiles)
     if mol is None:
         return None
     new_order = Chem.rdmolfiles.CanonicalRankAtoms(mol)
     mol = Chem.rdmolops.RenumberAtoms(mol, new_order)
-    # Featurize Atoms
+    # 为每个原子提取 one-hot 与数值特征
     n_atoms = mol.GetNumAtoms()
     atom_features = []
 
@@ -120,8 +120,8 @@ def smiles_to_graph(smiles, vocab, max_length=5, n_virtual_nodes=8, add_self_loo
         atom = mol.GetAtomWithIdx(atom_id)
         atom_features.append(atom_featurizer_all(atom))
     atomIDPair_to_tripletId = np.ones(shape=(n_atoms, n_atoms)) * np.nan
-    # Construct and Featurize Triplet Nodes
-    ## bonded atoms
+    # 构建 triplet 节点及其特征
+    # 已成键原子对会被编码成真实 triplet 节点
     triplet_labels = []
     virtual_atom_and_virtual_node_labels = []
 
@@ -153,7 +153,7 @@ def smiles_to_graph(smiles, vocab, max_length=5, n_virtual_nodes=8, add_self_loo
             end_atom_id, begin_atom_id
         ] = triplet_id
         triplet_id += 1
-    ## unbonded atoms
+    # 未成键的孤立原子会和虚拟原子占位符配对
     for atom_id in range(n_atoms):
         if atom_id not in bonded_atoms:
             atom_pairs_features_in_triplets.append(
@@ -169,8 +169,8 @@ def smiles_to_graph(smiles, vocab, max_length=5, n_virtual_nodes=8, add_self_loo
                 vocab.index(atom_features[atom_id][:N_ATOM_TYPES].index(1), 999, 999)
             )
             virtual_atom_and_virtual_node_labels.append(VIRTUAL_ATOM_INDICATOR)
-    # Construct and Featurize Paths between Triplets
-    ## line graph paths
+    # 构建 triplet 间路径
+    # 线图路径表示共享原子的局部结构关系
     edges = []
     paths = []
     line_graph_path_labels = []
@@ -195,7 +195,7 @@ def smiles_to_graph(smiles, vocab, max_length=5, n_virtual_nodes=8, add_self_loo
             mol_graph_path_labels.extend([0] * n_new_edges)
             virtual_path_labels.extend([0] * n_new_edges)
             self_loop_labels.extend([0] * n_new_edges)
-    # # molecule graph paths
+    # 分子图最短路径补充更长距离的结构依赖
     adj_matrix = np.array(Chem.rdmolops.GetAdjacencyMatrix(mol))
     nx_g = nx.from_numpy_array(adj_matrix)
     paths_dict = dict(nx.algorithms.all_pairs_shortest_path(nx_g, max_length + 1))
@@ -223,6 +223,7 @@ def smiles_to_graph(smiles, vocab, max_length=5, n_virtual_nodes=8, add_self_loo
                 mol_graph_path_labels.append(1)
                 virtual_path_labels.append(0)
                 self_loop_labels.append(0)
+    # 追加虚拟节点，让下游模型有位置挂载全局描述符表示。
     for n in range(n_virtual_nodes):
         for i in range(len(atom_pairs_features_in_triplets) - n):
             edges.append([len(atom_pairs_features_in_triplets), i])
@@ -278,13 +279,13 @@ def smiles_to_graph(smiles, vocab, max_length=5, n_virtual_nodes=8, add_self_loo
 def smiles_to_graph_tune(smiles, max_length=5, n_virtual_nodes=8, add_self_loop=True):
     d_atom_feats = 137
     d_bond_feats = 14
-    # Canonicalize
+    # 先将 SMILES 规范化，固定原子顺序，保证同一分子对应稳定图结构。
     mol = Chem.MolFromSmiles(smiles)
     if mol is None:
         return None
     new_order = Chem.rdmolfiles.CanonicalRankAtoms(mol)
     mol = Chem.rdmolops.RenumberAtoms(mol, new_order)
-    # Featurize Atoms
+    # 为每个原子提取 one-hot 与数值特征
     n_atoms = mol.GetNumAtoms()
     atom_features = []
 
@@ -292,8 +293,8 @@ def smiles_to_graph_tune(smiles, max_length=5, n_virtual_nodes=8, add_self_loop=
         atom = mol.GetAtomWithIdx(atom_id)
         atom_features.append(atom_featurizer_all(atom))
     atomIDPair_to_tripletId = np.ones(shape=(n_atoms, n_atoms)) * np.nan
-    # Construct and Featurize Triplet Nodes
-    ## bonded atoms
+    # 构建 triplet 节点及其特征
+    # 已成键原子对会被编码成真实 triplet 节点
     virtual_atom_and_virtual_node_labels = []
 
     atom_pairs_features_in_triplets = []
@@ -317,7 +318,7 @@ def smiles_to_graph_tune(smiles, max_length=5, n_virtual_nodes=8, add_self_loop=
             end_atom_id, begin_atom_id
         ] = triplet_id
         triplet_id += 1
-    ## unbonded atoms
+    # 未成键的孤立原子会和虚拟原子占位符配对
     for atom_id in range(n_atoms):
         if atom_id not in bonded_atoms:
             atom_pairs_features_in_triplets.append(
@@ -330,8 +331,8 @@ def smiles_to_graph_tune(smiles, max_length=5, n_virtual_nodes=8, add_self_loop=
                 [VIRTUAL_BOND_FEATURE_PLACEHOLDER] * d_bond_feats
             )
             virtual_atom_and_virtual_node_labels.append(VIRTUAL_ATOM_INDICATOR)
-    # Construct and Featurize Paths between Triplets
-    ## line graph paths
+    # 构建 triplet 间路径
+    # 线图路径表示共享原子的局部结构关系
     edges = []
     paths = []
     line_graph_path_labels = []
@@ -356,7 +357,7 @@ def smiles_to_graph_tune(smiles, max_length=5, n_virtual_nodes=8, add_self_loop=
             mol_graph_path_labels.extend([0] * n_new_edges)
             virtual_path_labels.extend([0] * n_new_edges)
             self_loop_labels.extend([0] * n_new_edges)
-    # # molecule graph paths
+    # 分子图最短路径补充更长距离的结构依赖
     adj_matrix = np.array(Chem.rdmolops.GetAdjacencyMatrix(mol))
     nx_g = nx.from_numpy_array(adj_matrix)
     paths_dict = dict(nx.algorithms.all_pairs_shortest_path(nx_g, max_length + 1))
@@ -372,7 +373,7 @@ def smiles_to_graph_tune(smiles, max_length=5, n_virtual_nodes=8, add_self_loop=
                 path_start_triplet_id = triplet_ids[0]
                 path_end_triplet_id = triplet_ids[-1]
                 triplet_path = triplet_ids[1:-1]
-                # assert [path_start_triplet_id,path_end_triplet_id] not in edges
+                # 这里不强制去重，保留不同最短路径对应的结构信号。
                 triplet_path = (
                     [path_start_triplet_id]
                     + triplet_path
@@ -385,6 +386,7 @@ def smiles_to_graph_tune(smiles, max_length=5, n_virtual_nodes=8, add_self_loop=
                 mol_graph_path_labels.append(1)
                 virtual_path_labels.append(0)
                 self_loop_labels.append(0)
+    # 追加虚拟节点，让下游模型有位置挂载全局描述符表示。
     for n in range(n_virtual_nodes):
         for i in range(len(atom_pairs_features_in_triplets) - n):
             edges.append([len(atom_pairs_features_in_triplets), i])

@@ -30,7 +30,7 @@ if __name__ == "__main__":
     final_save_path = Path("./smiles2embedding.pkl")
 
     # -------- 参数 --------
-    batch_size = 64  # UniMol batch size
+    batch_size = 64  # UniMol 推理批大小
     chunk_size = 2000  # 每个中间文件处理多少个 SMILES
 
     # -------- 读取数据 --------

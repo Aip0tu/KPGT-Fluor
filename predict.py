@@ -134,7 +134,7 @@ def finetune(args):
         drop_last=False,
         collate_fn=collator,
     )
-    # Model Initialization
+    # 初始化 LiGhT 骨干网络，并为预测任务重建输出头
     model = LiGhT(
         d_node_feats=config["d_node_feats"],
         d_edge_feats=config["d_edge_feats"],
@@ -152,7 +152,7 @@ def finetune(args):
         feat_drop=0,
         n_node_types=vocab.vocab_size,
     ).to(device)
-    # Finetuning Setting
+    # 预测阶段只保留下游预测头，预训练辅助头在后面删除
 
     model.predictor = get_predictor(
         d_input_feats=config["d_g_feats"] * 4,
@@ -183,6 +183,7 @@ def finetune(args):
     if args.dataset_type == "classification":
         evaluator = Evaluator(args.dataset, args.metric, train_dataset.n_tasks)
     else:
+        # 回归任务使用训练集统计量，在评估时将预测值还原回原始量纲。
         evaluator = Evaluator(
             args.dataset,
             args.metric,
@@ -211,6 +212,7 @@ def finetune(args):
         # label_mean=torch.tensor(451.3890077340793, device=device),
         # label_std=torch.tensor(104.91068770529088, device=device),
     )
+    # 分别导出 train / valid / test 结果，便于后续误差分析。
     best_train = trainer.predict(
         model, train_loader, save_dir=Path(args.results_dir) / "train"
     )

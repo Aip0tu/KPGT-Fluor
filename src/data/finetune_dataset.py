@@ -32,7 +32,7 @@ class MoleculeDataset(Dataset):
         md_path = os.path.join(root_path, f"{dataset}/molecular_descriptors.npz")
         sd_path = os.path.join(root_path, f"{dataset}/solvent_descriptors.npz")
         
-        # Load Data
+        # 读取原始表格、图缓存和辅助描述符特征
         df = pd.read_csv(dataset_path)
         if split is not None:
             use_idxs = np.load(split_path, allow_pickle=True)[SPLIT_TO_ID[split]]
@@ -51,7 +51,7 @@ class MoleculeDataset(Dataset):
         self.solvent_list = self.df["solvent"].tolist()
         self.use_idxs = use_idxs
 
-        # Dataset Setting
+        # 设置任务元信息，并为分类/回归任务准备统计量
         self.task_names = [dataset]
         self.n_tasks = len(self.task_names)
         self._pre_process()
@@ -71,6 +71,7 @@ class MoleculeDataset(Dataset):
         if not os.path.exists(self.cache_path):
             print(f"{self.cache_path} not exists, please run preprocess.py")
         else:
+            # 图缓存由 preprocess_downstream_dataset.py 预先生成，这里按 split 取子集。
             graphs, label_dict = load_graphs(self.cache_path)
             self.graphs = []
             for i in self.use_idxs:

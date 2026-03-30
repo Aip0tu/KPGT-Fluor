@@ -7,6 +7,7 @@ from .featurizer import smiles_to_graph
 
 
 def preprocess_batch_light(batch_num, batch_num_target, tensor_data):
+    # 为批图中的 path 索引补上前面子图的节点偏移量，避免不同分子之间串索引。
     batch_num = np.concatenate([[0], batch_num], axis=-1)
     cs_num = np.cumsum(batch_num)
     add_factors = np.concatenate(
@@ -79,7 +80,7 @@ class Collator_pretrain(object):
         g.ndata["mask"][keep_ids] = 3
         sl_labels = g.ndata["label"][g.ndata["mask"] >= 1].clone()
 
-        # Pre-replace
+        # 预替换阶段先把部分 triplet 换成其他类别，后续再交给掩码任务恢复。
         new_ids = np.random.choice(
             valid_ids, size=len(replace_ids), replace=True, p=probs
         )
@@ -162,7 +163,8 @@ class Collator_tune(object):
 
     def __call__(self, samples):
         smiles_list, solvent_list, graphs, fps, mds, sds, labels = map(list, zip(*samples))
-        
+
+        # 这里直接复用预处理阶段缓存好的单分子图，再在批级别统一修正路径索引。
         batched_graph = dgl.batch(graphs)
         fps = torch.stack(fps, dim=0).reshape(len(smiles_list), -1)
         mds = torch.stack(mds, dim=0).reshape(len(smiles_list), -1)

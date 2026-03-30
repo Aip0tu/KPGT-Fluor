@@ -121,7 +121,7 @@ class LiGhT(nn.Module):
         self.d_trip_path = d_g_feats//d_hpath_ratio
 
         self.mask_emb = nn.Embedding(1, d_g_feats)
-        # Distance Attention
+        # 距离注意力：根据路径长度、虚拟路径和自环类型编码边权
         self.path_len_emb = nn.Embedding(path_length+1, d_g_feats)
         self.virtual_path_emb = nn.Embedding(1, d_g_feats)
         self.self_loop_emb = nn.Embedding(1, d_g_feats)
@@ -130,7 +130,7 @@ class LiGhT(nn.Module):
             activation,
             nn.Linear(self.d_g_feats, n_heads)
         )
-        # Path Attention  
+        # 路径注意力：聚合路径中间 triplet 的结构表示
         self.trip_fortrans = nn.ModuleList([
             MLP(d_g_feats, self.d_trip_path, 2, activation) for _ in range(self.path_length)
         ])
@@ -139,7 +139,7 @@ class LiGhT(nn.Module):
             activation,
             nn.Linear(self.d_trip_path, n_heads)
         )
-        # Molecule Transformer Layers
+        # 分子级 Transformer 层堆叠
         self.mol_T_layers = nn.ModuleList([
             TripletTransformer(d_g_feats,d_hpath_ratio, path_length, n_heads, n_ffn_dense_layers, feat_drop, attn_drop, activation) for _ in range(n_mol_layers)
         ])
@@ -152,8 +152,8 @@ class LiGhT(nn.Module):
         mask = (path_indices[:,:]>=0).to(torch.int32)
         path_feats = torch.sum(mask, dim=-1)
         path_feats = self.path_len_emb(path_feats)
-        path_feats[g.edata['vp']==1] = self.virtual_path_emb.weight # virtual path
-        path_feats[g.edata['sl']==1] = self.self_loop_emb.weight # self loop
+        path_feats[g.edata['vp']==1] = self.virtual_path_emb.weight # 虚拟路径
+        path_feats[g.edata['sl']==1] = self.self_loop_emb.weight # 自环
         return path_feats    
     
     def _init_path(self, g, triplet_h, path_indices):
@@ -255,16 +255,16 @@ class LiGhTPredictor(nn.Module):
         super(LiGhTPredictor, self).__init__()
         self.d_g_feats = d_g_feats
         self.readout_mode=readout_mode
-        # Input
+        # 输入编码：分别编码原子对、键以及全局描述符挂载节点
         self.node_emb = AtomEmbedding(d_node_feats, d_g_feats, input_drop)
         self.edge_emb = BondEmbedding(d_edge_feats, d_g_feats, input_drop)
         self.triplet_emb = TripletEmbedding(d_g_feats, d_fp_feats, d_md_feats, d_sd_feats, activation)
         self.mask_emb = nn.Embedding(1, d_g_feats)
-        # Model
+        # 主干模型：对 triplet 图做消息传递
         self.model = LiGhT(
             d_g_feats,d_hpath_ratio, path_length, n_mol_layers, n_heads, n_ffn_dense_layers, feat_drop, attn_drop, activation
         )
-        # Predict
+        # 预训练阶段的多任务预测头
         # self.node_predictor = nn.Linear(d_g_feats, n_node_types)
         self.node_predictor = nn.Sequential(
             nn.Linear(d_g_feats, d_g_feats),
@@ -290,45 +290,45 @@ class LiGhTPredictor(nn.Module):
         self.apply(lambda module: init_params(module))
 
     def forward(self, g, fp, md, sd):
-        indicators = g.ndata['vavn'] # 0 indicates normal atoms and nodes (triplets); -1 indicates virutal atoms; >=1 indicate virtual nodes 
-        # Input
+        indicators = g.ndata['vavn'] # 0 表示真实 triplet；-1 表示虚拟原子；>=1 表示挂载全局特征的虚拟节点
+        # 输入编码
         node_h = self.node_emb(g.ndata['begin_end'], indicators)          
         edge_h = self.edge_emb(g.ndata['edge'], indicators)
         triplet_h = self.triplet_emb(node_h, edge_h, fp, md, sd, indicators)
         triplet_h[g.ndata['mask']==1] = self.mask_emb.weight
-        # Model
+        # 主干前向传播
         triplet_h = self.model(g, triplet_h)
-        # Predict
+        # 输出预训练任务所需的多路预测结果
         return self.node_predictor(triplet_h[g.ndata['mask']>=1]), self.fp_predictor(triplet_h[indicators==1]), self.md_predictor(triplet_h[indicators==2]), self.sd_predictor(triplet_h[indicators==3])
 
     def forward_tune(self, g, fp, md, sd, perturb=None):
-        indicators = g.ndata['vavn'] # 0 indicates normal atoms and nodes (triplets); -1 indicates virutal atoms; >=1 indicate virtual nodes 
-        # Input
+        indicators = g.ndata['vavn'] # 0 表示真实 triplet；-1 表示虚拟原子；>=1 表示挂载全局特征的虚拟节点
+        # 输入编码
         node_h = self.node_emb(g.ndata['begin_end'], indicators)          
         edge_h = self.edge_emb(g.ndata['edge'], indicators)
         triplet_h = self.triplet_emb(node_h, edge_h, fp, md, sd, indicators)
-        # Model
+        # 主干前向传播
         triplet_h = self.model(g, triplet_h)
         g.ndata['ht'] = triplet_h
-        # Readout
+        # 先取出虚拟节点表示，再移除它们对真实分子子图做读出
         fp_vn = triplet_h[indicators==1]
         md_vn = triplet_h[indicators==2]
         sd_vn = triplet_h[indicators==3]
         g.remove_nodes(np.where(indicators.detach().cpu().numpy()>=1)[0])
         readout = dgl.readout_nodes(g, 'ht', op=self.readout_mode)
         g_feats = torch.cat([fp_vn, md_vn, sd_vn, readout],dim=-1)
-        #Predict
+        # 下游任务预测
         return self.predictor(g_feats)
 
     def generate_fps(self, g, fp, md):
-        indicators = g.ndata['vavn'] # 0 indicates normal atoms and nodes (triplets); -1 indicates virutal atoms; >=1 indicate virtual nodes 
-        # Input
+        indicators = g.ndata['vavn'] # 0 表示真实 triplet；-1 表示虚拟原子；>=1 表示挂载全局特征的虚拟节点
+        # 输入编码
         node_h = self.node_emb(g.ndata['begin_end'], indicators)          
         edge_h = self.edge_emb(g.ndata['edge'], indicators)
         triplet_h = self.triplet_emb(node_h, edge_h, fp, md, indicators)
-       # Model
+        # 主干前向传播
         triplet_h = self.model(g, triplet_h)
-        # Readout
+        # 组合虚拟节点表示与分子级读出，作为传统模型的输入特征
         fp_vn = triplet_h[indicators==1]
         md_vn = triplet_h[indicators==2]
         g.ndata['ht'] = triplet_h

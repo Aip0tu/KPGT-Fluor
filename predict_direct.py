@@ -142,7 +142,7 @@ def finetune(args):
         drop_last=False,
         collate_fn=collator,
     )
-    # Model Initialization
+    # 初始化 LiGhT 骨干网络，并为预测任务重建输出头
     model = LiGhT(
         d_node_feats=config["d_node_feats"],
         d_edge_feats=config["d_edge_feats"],
@@ -160,7 +160,7 @@ def finetune(args):
         feat_drop=0,
         n_node_types=vocab.vocab_size,
     ).to(device)
-    # Finetuning Setting
+    # 预测阶段只保留下游预测头，预训练辅助头在后面删除
 
     model.predictor = get_predictor(
         d_input_feats=config["d_g_feats"] * 4,
@@ -194,8 +194,11 @@ def finetune(args):
         _split_method = Path(args.data_path).parent.name
         _task_name = args.dataset
         _fold = Path(args.data_path).name.split("_fold")[-1]
-        
-        df_path = Path(f"datasets/{_split_method}/consolidation_fold{_fold}/{_task_name}/{_task_name}.csv")  # from consolidation fetch the mean and std
+
+        # 跨数据集 direct 预测时，使用 consolidation 训练集的均值和方差恢复真实量纲。
+        df_path = Path(
+            f"datasets/{_split_method}/consolidation_fold{_fold}/{_task_name}/{_task_name}.csv"
+        )
 
         mean, std = get_mean_std(df_path, _task_name)
         evaluator = Evaluator(
@@ -224,6 +227,7 @@ def finetune(args):
         # label_mean=torch.tensor(451.3890077340793, device=device),
         # label_std=torch.tensor(104.91068770529088, device=device),
     )
+    # 分别导出 train / valid / test 结果，便于后续误差分析。
     best_train = trainer.predict(
         model, train_loader, save_dir=Path(args.results_dir) / "train"
     )

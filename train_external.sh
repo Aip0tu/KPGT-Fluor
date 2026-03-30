@@ -4,14 +4,14 @@ set -e
 
 fold=1
 split_method="random"
-dataset_name="xanthene"            # cyanine, xanthene
-task_name="log_molar_absorptivity" # absorption, emission, quantum_yield, log_molar_absorptivity
+dataset_name="xanthene"            # 可选数据集：cyanine、xanthene
+task_name="log_molar_absorptivity" # 可选任务：absorption、emission、quantum_yield、log_molar_absorptivity
 cuda_id=3
 
 base_data_path="datasets/${split_method}/${dataset_name}_fold${fold}"
 split_file="${base_data_path}/${task_name}/splits.npy"
 
-# Check if the splits file exists, if not, create it
+# 如果切分文件不存在，则先为当前任务生成 train/valid/test 切分
 if [ ! -f "$split_file" ]; then
     echo "Splits file ($split_file) not found, creating splits..."
     python preprocess_downstream_dataset.py --data_path "$base_data_path" --dataset "$task_name"
