@@ -6,7 +6,7 @@ split_method="random"
 fold=1
 dataset_name="consolidation" # 可选数据集：consolidation
 task_name="quantum_yield"    # 可选任务：absorption、emission、quantum_yield、log_molar_absorptivity
-cuda_id=2
+cuda_id="${1:-${CUDA_ID-0}}"
 
 split_file="datasets/${split_method}/${dataset_name}_fold${fold}/${task_name}/splits.npy"
 if [ ! -f "$split_file" ]; then

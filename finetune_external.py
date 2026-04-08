@@ -1,7 +1,7 @@
 from pathlib import Path
 from loguru import logger
 
-from src.utils import set_random_seed
+from src.utils import get_device, set_random_seed
 import argparse
 import torch
 from torch import nn
@@ -177,12 +177,12 @@ def finetune(args):
     """
     加载预训练权重并执行外部数据微调。
     """
-    set_random_seed(args.seed)
+    set_random_seed(args.seed, args.n_threads)
     config = config_dict[args.config]
     vocab = Vocab(N_ATOM_TYPES, N_BOND_TYPES)
     g = torch.Generator()
     g.manual_seed(args.seed)
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = get_device()
     collator = Collator_tune(config["path_length"])
 
     # 加载训练、验证和测试数据

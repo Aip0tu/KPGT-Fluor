@@ -94,7 +94,7 @@ def preprocess_dataset(args):
     valid_idx = np.where(df["split"] == "valid")[0]
     test_idx = np.where(df["split"] == "test")[0]
 
-    split_idx = np.array([train_idx, valid_idx, test_idx])
+    split_idx = np.array([train_idx, valid_idx, test_idx], dtype=object)
     np.save(f"{args.data_path}/{args.dataset}/splits.npy", split_idx)
 
 
