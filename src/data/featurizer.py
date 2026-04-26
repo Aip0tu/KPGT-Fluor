@@ -124,6 +124,7 @@ def smiles_to_graph(smiles, vocab, max_length=5, n_virtual_nodes=8, add_self_loo
     # 已成键原子对会被编码成真实 triplet 节点
     triplet_labels = []
     virtual_atom_and_virtual_node_labels = []
+    triplet_atom_ids = []
 
     atom_pairs_features_in_triplets = []
     bond_features_in_triplets = []
@@ -149,6 +150,7 @@ def smiles_to_graph(smiles, vocab, max_length=5, n_virtual_nodes=8, add_self_loo
             )
         )
         virtual_atom_and_virtual_node_labels.append(0)
+        triplet_atom_ids.append([begin_atom_id, end_atom_id])
         atomIDPair_to_tripletId[begin_atom_id, end_atom_id] = atomIDPair_to_tripletId[
             end_atom_id, begin_atom_id
         ] = triplet_id
@@ -169,6 +171,7 @@ def smiles_to_graph(smiles, vocab, max_length=5, n_virtual_nodes=8, add_self_loo
                 vocab.index(atom_features[atom_id][:N_ATOM_TYPES].index(1), 999, 999)
             )
             virtual_atom_and_virtual_node_labels.append(VIRTUAL_ATOM_INDICATOR)
+            triplet_atom_ids.append([atom_id, -1])
     # 构建 triplet 间路径
     # 线图路径表示共享原子的局部结构关系
     edges = []
@@ -253,6 +256,7 @@ def smiles_to_graph(smiles, vocab, max_length=5, n_virtual_nodes=8, add_self_loo
         )
         triplet_labels.append(vocab.index(999, 999, 999))
         virtual_atom_and_virtual_node_labels.append(n + 1)
+        triplet_atom_ids.append([-1, -1])
     if add_self_loop:
         for i in range(len(atom_pairs_features_in_triplets)):
             edges.append([i, i])
@@ -268,6 +272,7 @@ def smiles_to_graph(smiles, vocab, max_length=5, n_virtual_nodes=8, add_self_loo
     g.ndata["edge"] = torch.FloatTensor(bond_features_in_triplets)
     g.ndata["label"] = torch.LongTensor(triplet_labels)
     g.ndata["vavn"] = torch.LongTensor(virtual_atom_and_virtual_node_labels)
+    g.ndata["atoms"] = torch.LongTensor(triplet_atom_ids)
     g.edata["path"] = torch.LongTensor(paths)
     g.edata["lgp"] = torch.BoolTensor(line_graph_path_labels)
     g.edata["mgp"] = torch.BoolTensor(mol_graph_path_labels)
@@ -296,6 +301,7 @@ def smiles_to_graph_tune(smiles, max_length=5, n_virtual_nodes=8, add_self_loop=
     # 构建 triplet 节点及其特征
     # 已成键原子对会被编码成真实 triplet 节点
     virtual_atom_and_virtual_node_labels = []
+    triplet_atom_ids = []
 
     atom_pairs_features_in_triplets = []
     bond_features_in_triplets = []
@@ -314,6 +320,7 @@ def smiles_to_graph_tune(smiles, max_length=5, n_virtual_nodes=8, add_self_loop=
         bonded_atoms.add(begin_atom_id)
         bonded_atoms.add(end_atom_id)
         virtual_atom_and_virtual_node_labels.append(0)
+        triplet_atom_ids.append([begin_atom_id, end_atom_id])
         atomIDPair_to_tripletId[begin_atom_id, end_atom_id] = atomIDPair_to_tripletId[
             end_atom_id, begin_atom_id
         ] = triplet_id
@@ -331,6 +338,7 @@ def smiles_to_graph_tune(smiles, max_length=5, n_virtual_nodes=8, add_self_loop=
                 [VIRTUAL_BOND_FEATURE_PLACEHOLDER] * d_bond_feats
             )
             virtual_atom_and_virtual_node_labels.append(VIRTUAL_ATOM_INDICATOR)
+            triplet_atom_ids.append([atom_id, -1])
     # 构建 triplet 间路径
     # 线图路径表示共享原子的局部结构关系
     edges = []
@@ -415,6 +423,7 @@ def smiles_to_graph_tune(smiles, max_length=5, n_virtual_nodes=8, add_self_loop=
             [VIRTUAL_BOND_FEATURE_PLACEHOLDER] * d_bond_feats
         )
         virtual_atom_and_virtual_node_labels.append(n + 1)
+        triplet_atom_ids.append([-1, -1])
     if add_self_loop:
         for i in range(len(atom_pairs_features_in_triplets)):
             edges.append([i, i])
@@ -429,6 +438,7 @@ def smiles_to_graph_tune(smiles, max_length=5, n_virtual_nodes=8, add_self_loop=
     g.ndata["begin_end"] = torch.FloatTensor(atom_pairs_features_in_triplets)
     g.ndata["edge"] = torch.FloatTensor(bond_features_in_triplets)
     g.ndata["vavn"] = torch.LongTensor(virtual_atom_and_virtual_node_labels)
+    g.ndata["atoms"] = torch.LongTensor(triplet_atom_ids)
     g.edata["path"] = torch.LongTensor(paths)
     g.edata["lgp"] = torch.BoolTensor(line_graph_path_labels)
     g.edata["mgp"] = torch.BoolTensor(mol_graph_path_labels)

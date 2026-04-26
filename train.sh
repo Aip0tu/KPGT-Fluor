@@ -4,7 +4,7 @@ set -e
 
 split_method="random"
 dataset_name="consolidation" # 可选数据集：consolidation
-task_name="absorption" # 可选任务：absorption、emission、quantum_yield、log_molar_absorptivity
+task_name="quantum_yield" # 可选任务：absorption、emission、quantum_yield、log_molar_absorptivity
 cuda_id="${1:-${CUDA_ID-0}}"
 model_path="models/pretrained/base.pth"
 
